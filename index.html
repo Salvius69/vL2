@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Akshara</title>
+
+  <!-- Gothic-but-cinematic fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=UnifrakturCook:wght@700&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg0:#030106;
+      --bg1:#120410;
+      --bg2:#000;
+
+      --wine: rgba(128,0,32,.28);
+      --rose: rgba(194,24,91,.14);
+
+      --gold:#ffcf7a;
+      --amber:#ff8a2b;
+      --glow: rgba(255,183,0,.28);
+
+      --text: rgba(248,250,252,.93);
+      --muted: rgba(248,250,252,.55);
+    }
+
+    *{ box-sizing:border-box; margin:0; padding:0; }
+    html,body{ height:100%; }
+    body{
+      overflow:hidden;
+      background:
+        radial-gradient(1100px 700px at 18% 15%, var(--wine), transparent 60%),
+        radial-gradient(900px 650px at 85% 30%, var(--rose), transparent 60%),
+        radial-gradient(1000px 900px at 50% 110%, rgba(255,212,229,.05), transparent 70%),
+        linear-gradient(135deg, var(--bg0), var(--bg1) 55%, var(--bg2));
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+
+    /* Canvas background layer */
+    canvas#bg{
+      position:fixed;
+      inset:0;
+      width:100%;
+      height:100%;
+      z-index:0;
+      pointer-events:none;
+    }
+
+    /* Cinematic vignette + subtle grain */
+    .vignette{
+      position:fixed; inset:0;
+      pointer-events:none;
+      background: radial-gradient(circle at 50% 45%, transparent 30%, rgba(0,0,0,.74) 88%);
+      z-index:1;
+    }
+    .grain{
+      position:fixed; inset:0;
+      pointer-events:none;
+      background:
+        repeating-linear-gradient(
+          0deg,
+          rgba(255,255,255,.03) 0px,
+          rgba(255,255,255,.03) 1px,
+          rgba(0,0,0,0) 2px,
+          rgba(0,0,0,0) 5px
+        );
+      opacity:.055;
+      z-index:1;
+      mix-blend-mode: overlay;
+    }
+
+    .stage{
+      position:relative;
+      height:100%;
+      display:grid;
+      place-items:center;
+      z-index:2;
+    }
+
+    /* ===== Ring text (slow anti-clockwise spin; no drift) ===== */
+    .orbit{
+      position:absolute;
+      width:min(620px, 96vw);
+      aspect-ratio:1/1;
+      display:grid;
+      place-items:center;
+      pointer-events:none;
+      opacity:.9;
+      filter: drop-shadow(0 0 22px rgba(255,183,0,.08));
+    }
+
+    .orbit svg{
+      width:100%;
+      height:100%;
+      transform-origin: 50% 50%;
+      animation: orbitCCW 90s linear infinite; /* slow, anti-clockwise */
+    }
+
+    @keyframes orbitCCW{
+      from{ transform: rotate(0deg); }
+      to{ transform: rotate(-360deg); }
+    }
+
+    .orbit text{
+      font-family: "Cinzel Decorative","UnifrakturCook",serif;
+      font-weight:700;
+      letter-spacing: 8px;
+      font-size: 18px;
+      fill: rgba(255, 220, 175, 0.44);
+    }
+
+    /* ===== Center sigil (rotate wrapper + bloom on svg) ===== */
+    .sigil-wrap{
+      position:relative;
+      width:min(320px, 70vw);
+      aspect-ratio: 1/1;
+      display:grid;
+      place-items:center;
+      pointer-events:auto;
+      cursor:pointer;
+      user-select:none;
+      -webkit-tap-highlight-color: transparent;
+      transform: translateY(-10px);
+    }
+    .sigil-wrap:active{ transform: translateY(-10px) scale(.99); }
+
+    /* Rotator keeps the look stable */
+    .sigil-rotator{
+      width:100%;
+      height:100%;
+      display:grid;
+      place-items:center;
+      transform-origin: 50% 50%;
+      animation: sigilCCW 120s linear infinite; /* slower than ring */
+    }
+    @keyframes sigilCCW{
+      from{ transform: rotate(0deg); }
+      to{ transform: rotate(-360deg); }
+    }
+
+    .hint-dot{
+      position:absolute;
+      width:10px; height:10px;
+      border-radius:999px;
+      background: radial-gradient(circle, #fff, #ffe8c7 40%, #ffcf7a 75%);
+      box-shadow: 0 0 16px rgba(255,255,255,.22), 0 0 50px rgba(255,183,0,.18);
+      animation: pulse 1.9s ease-in-out infinite;
+      opacity:.95;
+      z-index:3;
+    }
+    @keyframes pulse{
+      0%,100%{ transform: scale(.95); opacity:.75; }
+      50%{ transform: scale(1.25); opacity:1; }
+    }
+
+    .sigil{
+      width:100%;
+      height:100%;
+      filter: drop-shadow(0 0 28px rgba(255,183,0,.14));
+      animation: bloom 7.5s ease-in-out infinite;
+      transform-origin: 50% 50%;
+    }
+    @keyframes bloom{
+      0%,100%{ transform: scale(.995); }
+      50%{ transform: scale(1.03); }
+    }
+
+    /* ===== Quotes (ONLY quotes) ===== */
+    .copy{
+      position:absolute;
+      left:50%;
+      bottom: 10.5%;
+      transform: translateX(-50%);
+      width:min(920px, 92vw);
+      min-height: 92px;
+      text-align:center;
+      z-index:3;
+      pointer-events:none;
+    }
+
+    .line{
+      position:absolute;
+      left:50%;
+      transform: translateX(-50%) translateY(14px);
+      width:100%;
+      opacity:0;
+      transition: opacity 760ms ease, transform 760ms ease, filter 760ms ease;
+      text-shadow: 0 12px 50px rgba(0,0,0,.74);
+      font-family: "Cinzel Decorative", ui-serif, Georgia, serif;
+      font-size: 18px;
+      line-height: 1.7;
+      letter-spacing: .02em;
+      color: rgba(248,250,252,.90);
+      filter: blur(2px);
+    }
+    .line.show{
+      opacity:1;
+      transform: translateX(-50%) translateY(0);
+      filter: blur(0px);
+    }
+
+    /* Ripple + sparks */
+    .ripple{
+      position:fixed;
+      width:14px; height:14px;
+      border-radius:999px;
+      border: 1px solid rgba(255,214,160,.55);
+      box-shadow: 0 0 34px rgba(255,183,0,.20);
+      transform: translate(-50%,-50%);
+      pointer-events:none;
+      z-index:9;
+      animation: ripple 720ms ease-out forwards;
+    }
+    @keyframes ripple{
+      0%{ opacity:.85; transform: translate(-50%,-50%) scale(1); }
+      100%{ opacity:0; transform: translate(-50%,-50%) scale(18); }
+    }
+    .spark{
+      position:fixed;
+      width:4px; height:4px;
+      border-radius:50%;
+      background: radial-gradient(circle, rgba(255,214,160,.95), rgba(255,214,160,0) 70%);
+      box-shadow: 0 0 12px rgba(255,183,0,.22);
+      pointer-events:none;
+      z-index:10;
+      animation: floatUp 1100ms ease-out forwards;
+    }
+    @keyframes floatUp{
+      0%{ opacity:.9; transform: translate(0,0) scale(1); }
+      100%{ opacity:0; transform: translate(var(--tx), var(--ty)) scale(0); }
+    }
+
+    @media (max-width:520px){
+      .orbit text{ font-size: 16px; letter-spacing: 7px; }
+      .copy{ bottom: 10%; }
+      .line{ font-size: 16px; }
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="bg"></canvas>
+  <div class="vignette"></div>
+  <div class="grain"></div>
+
+  <div class="stage">
+    <!-- Ring text: only AKSHARA -->
+    <div class="orbit" aria-hidden="true">
+      <svg viewBox="0 0 200 200">
+        <defs>
+          <path id="circlePath"
+            d="M100,100 m-78,0 a78,78 0 1,1 156,0 a78,78 0 1,1 -156,0" />
+        </defs>
+        <text>
+          <textPath href="#circlePath" startOffset="50%" text-anchor="middle">
+            AKSHARA AKSHARA AKSHARA AKSHARA AKSHARA AKSHARA AKSHARA
+          </textPath>
+        </text>
+      </svg>
+    </div>
+
+    <!-- Center cinematic “sigil rose” -->
+    <div class="sigil-wrap" id="sigil" role="button" tabindex="0" aria-label="Reveal quote">
+      <div class="sigil-rotator">
+        <svg class="sigil" viewBox="0 0 220 220" aria-hidden="true">
+          <defs>
+            <radialGradient id="core" cx="50%" cy="45%" r="60%">
+              <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
+              <stop offset="28%" stop-color="#ffe8c7" stop-opacity="0.95"/>
+              <stop offset="55%" stop-color="#ffcf7a" stop-opacity="0.7"/>
+              <stop offset="100%" stop-color="#ff8a2b" stop-opacity="0"/>
+            </radialGradient>
+
+            <linearGradient id="petalGrad" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stop-color="#b44210" stop-opacity="0.75"/>
+              <stop offset="35%" stop-color="#ff8a2b" stop-opacity="0.95"/>
+              <stop offset="100%" stop-color="#ffcf7a" stop-opacity="0.95"/>
+            </linearGradient>
+
+            <filter id="glow">
+              <feGaussianBlur stdDeviation="4.2" result="b"/>
+              <feColorMatrix in="b" type="matrix"
+                values="1 0 0 0 0
+                        0 0.72 0 0 0
+                        0 0 0.35 0 0
+                        0 0 0 0.9 0" result="c"/>
+              <feMerge>
+                <feMergeNode in="c"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+
+            <filter id="soft">
+              <feGaussianBlur stdDeviation="1.2"/>
+            </filter>
+          </defs>
+
+          <circle cx="110" cy="110" r="74" fill="url(#core)" filter="soft" opacity="0.55"/>
+
+          <g filter="url(#glow)" opacity="0.95">
+            <g transform="translate(110 110)">
+              <path id="petal"
+                d="M0,-74
+                   C18,-58 18,-28 0,-8
+                   C-18,-28 -18,-58 0,-74 Z"
+                fill="url(#petalGrad)" opacity="0.95"/>
+              <use href="#petal" transform="rotate(30)"/>
+              <use href="#petal" transform="rotate(60)"/>
+              <use href="#petal" transform="rotate(90)"/>
+              <use href="#petal" transform="rotate(120)"/>
+              <use href="#petal" transform="rotate(150)"/>
+              <use href="#petal" transform="rotate(180)"/>
+              <use href="#petal" transform="rotate(210)"/>
+              <use href="#petal" transform="rotate(240)"/>
+              <use href="#petal" transform="rotate(270)"/>
+              <use href="#petal" transform="rotate(300)"/>
+              <use href="#petal" transform="rotate(330)"/>
+            </g>
+          </g>
+
+          <circle cx="110" cy="102" r="9" fill="#fff" opacity="0.95" filter="url(#glow)"/>
+        </svg>
+      </div>
+
+      <div class="hint-dot" id="hintDot" aria-hidden="true"></div>
+    </div>
+
+    <!-- Quotes (ONLY) -->
+    <div class="copy" aria-live="polite">
+        <p>tap flower</p>
+      <div class="line show" id="q0">“Some people feel like candlelight—quiet, warm, impossible to ignore.”</div>
+      <div class="line" id="q1">“A small devotion: remembering your name in the middle of everything.”</div>
+      <div class="line" id="q2">“Not a confession. Just a compliment you deserve.”</div>
+      <div class="line" id="q3">“If elegance had a sound, it would be the way you exist.”</div>
+      <div class="line" id="q4">“Today, I just wanted to leave something gentle behind.”</div>
+      <div class="line" id="q5">“There’s a calm kind of magic in you.”</div>
+      <div class="line" id="q6">“A little darkness, a little gold—still beautiful.”</div>
+    </div>
+  </div>
+
+  <script>
+    /* ===== Cinematic background: bokeh particles on canvas ===== */
+    const c = document.getElementById("bg");
+    const ctx = c.getContext("2d", { alpha: true });
+
+    const DPR = Math.min(2, window.devicePixelRatio || 1);
+    let W, H, particles;
+
+    function resize(){
+      W = c.width = Math.floor(innerWidth * DPR);
+      H = c.height = Math.floor(innerHeight * DPR);
+      c.style.width = innerWidth + "px";
+      c.style.height = innerHeight + "px";
+
+      const count = Math.floor((innerWidth * innerHeight) / 24000);
+      particles = new Array(Math.max(40, Math.min(140, count))).fill(0).map(() => ({
+        x: Math.random()*W,
+        y: Math.random()*H,
+        r: (Math.random()*2.4 + 0.8) * DPR,
+        a: Math.random()*0.35 + 0.08,
+        vx: (Math.random()*0.18 - 0.09) * DPR,
+        vy: (Math.random()*0.10 - 0.05) * DPR,
+        hue: Math.random() < 0.7 ? 28 : 345,
+        tw: Math.random()*Math.PI*2
+      }));
+    }
+    addEventListener("resize", resize);
+    resize();
+
+    function tick(){
+      ctx.clearRect(0,0,W,H);
+      ctx.fillStyle = "rgba(0,0,0,0.15)";
+      ctx.fillRect(0,0,W,H);
+
+      for(const p of particles){
+        p.tw += 0.02;
+        p.x += p.vx;
+        p.y += p.vy;
+
+        if(p.x < -50) p.x = W+50;
+        if(p.x > W+50) p.x = -50;
+        if(p.y < -50) p.y = H+50;
+        if(p.y > H+50) p.y = -50;
+
+        const twinkle = 0.65 + 0.35*Math.sin(p.tw);
+        ctx.beginPath();
+        ctx.fillStyle = `hsla(${p.hue}, 90%, 70%, ${p.a*twinkle})`;
+        ctx.shadowColor = `hsla(${p.hue}, 90%, 65%, ${0.22*twinkle})`;
+        ctx.shadowBlur = 18 * DPR;
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+        ctx.fill();
+      }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+
+    /* ===== Interaction: cycle quotes + sparks + ripple ===== */
+    const sigil = document.getElementById("sigil");
+    const hintDot = document.getElementById("hintDot");
+    const quotes = ["q0","q1","q2","q3","q4","q5","q6"].map(id => document.getElementById(id));
+    let idx = 0;
+
+    function ripple(x, y){
+      const r = document.createElement("div");
+      r.className = "ripple";
+      r.style.left = x + "px";
+      r.style.top = y + "px";
+      document.body.appendChild(r);
+      setTimeout(()=> r.remove(), 800);
+
+      for(let i=0;i<12;i++){
+        const s = document.createElement("div");
+        s.className = "spark";
+        s.style.left = (x + (Math.random()*46-23)) + "px";
+        s.style.top = (y + (Math.random()*46-23)) + "px";
+        s.style.setProperty("--tx", (Math.random()*170-85) + "px");
+        s.style.setProperty("--ty", (-70 - Math.random()*110) + "px");
+        document.body.appendChild(s);
+        setTimeout(()=> s.remove(), 1200);
+      }
+    }
+
+    function next(e){
+      if (hintDot) hintDot.style.opacity = "0";
+
+      const x = (e && e.clientX) ? e.clientX : (innerWidth/2);
+      const y = (e && e.clientY) ? e.clientY : (innerHeight/2);
+      ripple(x, y);
+
+      if (idx < quotes.length - 1){
+        quotes[idx].classList.remove("show");
+        idx++;
+        quotes[idx].classList.add("show");
+      } else {
+        quotes[idx].style.transform = "translateX(-50%) translateY(0) scale(1.03)";
+        setTimeout(()=> quotes[idx].style.transform = "translateX(-50%) translateY(0) scale(1)", 220);
+      }
+    }
+
+    sigil.addEventListener("pointerdown", next);
+    sigil.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); next(e); }
+    });
+  </script>
+</body>
+</html>
